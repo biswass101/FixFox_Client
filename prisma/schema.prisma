@@ -1,0 +1,504 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  REPORTER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum WorkOrderStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum WorkOrderCategory {
+  PLUMBING
+  ELECTRICAL
+  HVAC
+  STRUCTURAL
+  CLEANING
+  SAFETY
+  EQUIPMENT
+  FURNITURE
+  IT_NETWORK
+  PEST_CONTROL
+  LANDSCAPING
+  ELEVATOR
+  FIRE_SAFETY
+  GENERAL
+  OTHER
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  OUT_OF_SERVICE
+}
+
+enum CostType {
+  PARTS
+  LABOR
+}
+
+enum AIAnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVIEWED
+}
+
+enum NotificationType {
+  WORK_ORDER_ASSIGNED
+  WORK_ORDER_STATUS_CHANGED
+  WORK_ORDER_OVERDUE
+  DEADLINE_APPROACHING
+  AI_ANALYSIS_COMPLETED
+  AI_ANALYSIS_FAILED
+  RECURRING_FAULT_DETECTED
+  INVITATION_RECEIVED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum RecurringFaultStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Organization {
+  id              String             @id @default(uuid()) @db.Uuid
+  name            String
+  slug            String             @unique
+  status          OrganizationStatus @default(ACTIVE)
+  defaultCurrency String             @default("BDT")
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  users                User[]
+  locations            Location[]
+  assets               Asset[]
+  workOrders           WorkOrder[]
+  invitations          Invitation[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  slaConfigs           SlaConfig?
+  recurringFaultAlerts RecurringFaultAlert[]
+
+  @@map("organizations")
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @db.Uuid
+  fullName        String
+  email           String
+  normalizedEmail String
+  passwordHash    String
+  role            UserRole  @default(REPORTER)
+  isActive        Boolean   @default(true)
+  phone           String?
+  skills          String[]
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization        Organization             @relation(fields: [organizationId], references: [id])
+  sessions            Session[]
+  reportedWorkOrders  WorkOrder[]              @relation("WorkOrderReporter")
+  assignedWorkOrders  WorkOrder[]              @relation("WorkOrderAssignee")
+  workNotes           WorkNote[]
+  workOrderCosts      WorkOrderCost[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  invitationsSent     Invitation[]
+  assignmentsMade     WorkOrderAssignment[]    @relation("AssignmentAssigner")
+  assignmentsReceived WorkOrderAssignment[]    @relation("AssignmentTechnician")
+  statusChanges       WorkOrderStatusHistory[]
+  aiReviews           WorkOrderAIAnalysis[]
+  uploadedImages      WorkOrderImage[]
+
+  @@unique([normalizedEmail, organizationId])
+  @@index([organizationId])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Invitation {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @db.Uuid
+  email           String
+  normalizedEmail String
+  role            UserRole
+  tokenHash       String           @unique
+  status          InvitationStatus @default(PENDING)
+  invitedById     String           @db.Uuid
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invitedBy    User         @relation(fields: [invitedById], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([tokenHash])
+  @@map("invitations")
+}
+
+model Location {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  building       String?
+  floor          String?
+  room           String?
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  assets               Asset[]
+  workOrders           WorkOrder[]
+  recurringFaultAlerts RecurringFaultAlert[]
+
+  @@unique([organizationId, name])
+  @@map("locations")
+}
+
+model Asset {
+  id                String         @id @default(uuid()) @db.Uuid
+  organizationId    String         @db.Uuid
+  locationId        String         @db.Uuid
+  assetCode         String
+  name              String
+  category          String
+  manufacturer      String?
+  modelNumber       String?
+  serialNumber      String?
+  purchaseDate      DateTime?
+  warrantyExpiresAt DateTime?
+  condition         AssetCondition @default(GOOD)
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  location             Location              @relation(fields: [locationId], references: [id])
+  workOrders           WorkOrder[]
+  recurringFaultAlerts RecurringFaultAlert[]
+
+  @@unique([organizationId, assetCode])
+  @@map("assets")
+}
+
+model WorkOrder {
+  id                String            @id @default(uuid()) @db.Uuid
+  organizationId    String            @db.Uuid
+  reporterId        String            @db.Uuid
+  assigneeId        String?           @db.Uuid
+  locationId        String            @db.Uuid
+  assetId           String?           @db.Uuid
+  title             String
+  description       String            @db.Text
+  category          WorkOrderCategory @default(GENERAL)
+  priority          WorkOrderPriority @default(MEDIUM)
+  status            WorkOrderStatus   @default(OPEN)
+  dueAt             DateTime?
+  assignedAt        DateTime?
+  startedAt         DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  resolutionSummary String?           @db.Text
+  version           Int               @default(1)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  organization  Organization             @relation(fields: [organizationId], references: [id])
+  reporter      User                     @relation("WorkOrderReporter", fields: [reporterId], references: [id])
+  assignee      User?                    @relation("WorkOrderAssignee", fields: [assigneeId], references: [id])
+  location      Location                 @relation(fields: [locationId], references: [id])
+  asset         Asset?                   @relation(fields: [assetId], references: [id])
+  images        WorkOrderImage[]
+  aiAnalysis    WorkOrderAIAnalysis?
+  assignments   WorkOrderAssignment[]
+  statusHistory WorkOrderStatusHistory[]
+  workNotes     WorkNote[]
+  costs         WorkOrderCost[]
+  notifications Notification[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([organizationId, assigneeId])
+  @@index([organizationId, locationId])
+  @@index([organizationId, assetId])
+  @@index([organizationId, dueAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, category])
+  @@map("work_orders")
+}
+
+model WorkOrderImage {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @db.Uuid
+  workOrderId        String   @db.Uuid
+  cloudinaryPublicId String
+  secureUrl          String
+  resourceType       String   @default("image")
+  format             String?
+  byteSize           Int
+  uploadedById       String   @db.Uuid
+  createdAt          DateTime @default(now())
+
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [id])
+  uploadedBy User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_order_images")
+}
+
+model WorkOrderAIAnalysis {
+  id                    String             @id @default(uuid()) @db.Uuid
+  organizationId        String             @db.Uuid
+  workOrderId           String             @unique @db.Uuid
+  model                 String
+  modelVersion          String?
+  suggestedCategory     WorkOrderCategory?
+  suggestedPriority     WorkOrderPriority?
+  summary               String?            @db.Text
+  safetyFlags           Json?
+  rationale             String?            @db.Text
+  confidence            Float?
+  status                AIAnalysisStatus   @default(PENDING)
+  errorCode             String?
+  errorMessage          String?
+  reviewedById          String?            @db.Uuid
+  reviewedAt            DateTime?
+  accepted              Boolean?
+  overrideReason        String?
+  finalCategory         WorkOrderCategory?
+  finalPriority         WorkOrderPriority?
+  processingStartedAt   DateTime?
+  processingCompletedAt DateTime?
+  tokenUsage            Int?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [id])
+  reviewedBy User?     @relation(fields: [reviewedById], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([workOrderId])
+  @@map("work_order_ai_analyses")
+}
+
+model WorkOrderAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  workOrderId    String    @db.Uuid
+  technicianId   String    @db.Uuid
+  assignedById   String    @db.Uuid
+  assignedAt     DateTime  @default(now())
+  unassignedAt   DateTime?
+  reason         String?
+  createdAt      DateTime  @default(now())
+
+  workOrder  WorkOrder @relation(fields: [workOrderId], references: [id])
+  technician User      @relation("AssignmentTechnician", fields: [technicianId], references: [id])
+  assignedBy User      @relation("AssignmentAssigner", fields: [assignedById], references: [id])
+
+  @@index([workOrderId])
+  @@index([technicianId])
+  @@map("work_order_assignments")
+}
+
+model WorkOrderStatusHistory {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  workOrderId    String           @db.Uuid
+  changedById    String           @db.Uuid
+  previousStatus WorkOrderStatus?
+  newStatus      WorkOrderStatus
+  reason         String?
+  createdAt      DateTime         @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  changedBy User      @relation(fields: [changedById], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_order_status_histories")
+}
+
+model WorkNote {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  workOrderId    String   @db.Uuid
+  authorId       String   @db.Uuid
+  body           String   @db.Text
+  isInternal     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  author    User      @relation(fields: [authorId], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_notes")
+}
+
+model WorkOrderCost {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  workOrderId    String   @db.Uuid
+  createdById    String   @db.Uuid
+  type           CostType
+  description    String
+  quantity       Decimal  @db.Decimal(10, 2)
+  unitCost       Decimal  @db.Decimal(12, 2)
+  totalCost      Decimal  @db.Decimal(14, 2)
+  laborHours     Decimal? @db.Decimal(6, 2)
+  currency       String   @default("BDT")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_order_costs")
+}
+
+model Notification {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  recipientId    String           @db.Uuid
+  workOrderId    String?          @db.Uuid
+  type           NotificationType
+  title          String
+  body           String           @db.Text
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  recipient    User         @relation(fields: [recipientId], references: [id])
+  workOrder    WorkOrder?   @relation(fields: [workOrderId], references: [id])
+
+  @@index([recipientId, readAt])
+  @@index([organizationId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  actorId        String?  @db.Uuid
+  action         String
+  entityType     String
+  entityId       String
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  actor        User?        @relation(fields: [actorId], references: [id])
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, createdAt])
+  @@map("audit_logs")
+}
+
+model SlaConfig {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String   @unique @db.Uuid
+  criticalResponseMinutes Int      @default(15)
+  highResponseMinutes     Int      @default(120)
+  mediumResponseMinutes   Int      @default(480)
+  lowResponseMinutes      Int      @default(2880)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("sla_configs")
+}
+
+model RecurringFaultAlert {
+  id                  String               @id @default(uuid()) @db.Uuid
+  organizationId      String               @db.Uuid
+  assetId             String?              @db.Uuid
+  locationId          String?              @db.Uuid
+  category            WorkOrderCategory?
+  relatedWorkOrderIds String[]
+  incidentCount       Int
+  detectionWindowDays Int
+  status              RecurringFaultStatus @default(ACTIVE)
+  detectedAt          DateTime             @default(now())
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  suggestedAction     String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  asset        Asset?       @relation(fields: [assetId], references: [id])
+  location     Location?    @relation(fields: [locationId], references: [id])
+
+  @@index([organizationId, status])
+  @@map("recurring_fault_alerts")
+}
