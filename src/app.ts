@@ -12,6 +12,10 @@ import { notFoundHandler } from './common/middleware/not-found';
 import { errorHandler } from './common/middleware/error-handler';
 import { healthRoutes } from './modules/health/health.routes';
 import { authRoutes } from './modules/auth/auth.routes';
+import { locationsRoutes } from './modules/locations/locations.routes';
+import { assetsRoutes } from './modules/assets/assets.routes';
+import { techniciansRoutes } from './modules/technicians/technicians.routes';
+import { workOrdersRoutes } from './modules/work-orders/work-orders.routes';
 
 const app = express();
 
@@ -36,6 +40,10 @@ app.use(
 
 app.use(healthRoutes);
 app.use(`${env.API_PREFIX}/auth`, authRoutes);
+app.use(`${env.API_PREFIX}/locations`, locationsRoutes);
+app.use(`${env.API_PREFIX}/assets`, assetsRoutes);
+app.use(`${env.API_PREFIX}/technicians`, techniciansRoutes);
+app.use(`${env.API_PREFIX}/work-orders`, workOrdersRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
