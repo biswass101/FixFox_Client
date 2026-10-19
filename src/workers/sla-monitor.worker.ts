@@ -15,8 +15,13 @@ export async function processSlaMonitoring(_job?: Job<SlaMonitorJobPayload>): Pr
   const now = new Date();
   const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
 
+  const organizationFilter = _job?.data?.organizationId
+    ? { organizationId: _job.data.organizationId }
+    : {};
+
   const activeWorkOrders = await prisma.workOrder.findMany({
     where: {
+      ...organizationFilter,
       status: {
         in: [
           WorkOrderStatus.OPEN,
@@ -69,16 +74,19 @@ export async function processSlaMonitoring(_job?: Job<SlaMonitorJobPayload>): Pr
         }
 
         if (recipients.length > 0) {
-          await prisma.notification.createMany({
-            data: recipients.map((r) => ({
-              organizationId: wo.organizationId,
-              recipientId: r.id,
-              workOrderId: wo.id,
-              type: NotificationType.WORK_ORDER_OVERDUE,
-              title: 'Work Order Overdue',
-              body: `Work order "${wo.title}" is overdue (due at ${dueAt.toISOString()}).`,
-            })),
-          });
+          try {
+            await prisma.notification.createMany({
+              data: recipients.map((r) => ({
+                organizationId: wo.organizationId,
+                recipientId: r.id,
+                workOrderId: wo.id,
+                type: NotificationType.WORK_ORDER_OVERDUE,
+                title: 'Work Order Overdue',
+                body: `Work order "${wo.title}" is overdue (due at ${dueAt.toISOString()}).`,
+              })),
+            });
+          } catch {
+          }
 
           for (const recipient of recipients) {
             await emailService.notifySlaBreached({

@@ -136,6 +136,18 @@ function handlePrismaError(err: Prisma.PrismaClientKnownRequestError): {
         },
       };
 
+    case 'P2023':
+      return {
+        statusCode: 400,
+        body: {
+          success: false,
+          error: {
+            code: ErrorCode.VALIDATION_ERROR,
+            message: 'Invalid parameter format: malformed identifier',
+          },
+        },
+      };
+
     default:
       return {
         statusCode: 500,

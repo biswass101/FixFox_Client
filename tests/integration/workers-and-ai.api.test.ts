@@ -253,7 +253,9 @@ describe('Workers, OpenRouter AI Triage & Background Jobs Integration Tests', ()
         },
       });
 
-      const firstRun = await processSlaMonitoring();
+      const firstRun = await processSlaMonitoring({
+        data: { organizationId: orgId, timestamp: Date.now() },
+      } as any);
       expect(firstRun.overdueCount).toBeGreaterThanOrEqual(1);
 
       const notification = await prisma.notification.findFirst({
@@ -264,7 +266,9 @@ describe('Workers, OpenRouter AI Triage & Background Jobs Integration Tests', ()
       });
       expect(notification).toBeDefined();
 
-      const secondRun = await processSlaMonitoring();
+      const secondRun = await processSlaMonitoring({
+        data: { organizationId: orgId, timestamp: Date.now() },
+      } as any);
       expect(secondRun.overdueCount).toBe(0);
     });
   });
