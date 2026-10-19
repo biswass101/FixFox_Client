@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodTypeAny, ZodError } from 'zod';
 import { AppError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-codes';
 
 export const validate = (
-  schema: AnyZodObject,
+  schema: ZodTypeAny,
   source: 'body' | 'query' | 'params' = 'body'
 ) => {
   return async (

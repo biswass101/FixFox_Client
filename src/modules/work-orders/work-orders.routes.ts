@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import { UserRole } from '@prisma/client';
 import { workOrdersController } from './work-orders.controller';
-import { authenticate } from '../../common/middleware/auth';
+import { aiTriageController } from '../ai-triage/ai-triage.controller';
+import { reviewAITriageSchema } from '../ai-triage/ai-triage.schemas';
+import { authenticate, authorize } from '../../common/middleware/auth';
 import { validate } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
 import {
@@ -108,6 +111,24 @@ router.patch(
 router.delete(
   '/:id/costs/:costId',
   asyncHandler(workOrdersController.deleteCost)
+);
+
+router.get(
+  '/:id/ai-analysis',
+  asyncHandler(aiTriageController.getAnalysis)
+);
+
+router.post(
+  '/:id/ai-analysis/retry',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  asyncHandler(aiTriageController.retryTriage)
+);
+
+router.post(
+  '/:id/ai-analysis/review',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  validate(reviewAITriageSchema),
+  asyncHandler(aiTriageController.reviewAnalysis)
 );
 
 export { router as workOrdersRoutes };

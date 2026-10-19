@@ -6,7 +6,9 @@ import {
   Prisma,
   WorkNote,
   WorkOrderCost,
+  AIAnalysisStatus,
 } from '@prisma/client';
+import { dispatchAITriage } from '../../queues';
 import { workOrdersRepository, WorkOrdersRepository } from './work-orders.repository';
 import { locationsRepository, LocationsRepository } from '../locations/locations.repository';
 import { assetsRepository, AssetsRepository } from '../assets/assets.repository';
@@ -61,7 +63,25 @@ export class WorkOrdersService {
     }
 
     const dueAt = await this.calculateDueAt(organizationId, input.priority);
-    return this.repo.create(organizationId, reporterId, input, dueAt);
+    const workOrder = await this.repo.create(organizationId, reporterId, input, dueAt);
+
+    await prisma.workOrderAIAnalysis
+      .create({
+        data: {
+          workOrderId: workOrder.id,
+          organizationId,
+          model: 'pending-openrouter',
+          status: AIAnalysisStatus.PENDING,
+        },
+      })
+      .catch(() => {});
+
+    await dispatchAITriage({
+      workOrderId: workOrder.id,
+      organizationId,
+    });
+
+    return workOrder;
   }
 
   async getById(
