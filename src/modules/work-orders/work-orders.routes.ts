@@ -3,6 +3,8 @@ import { UserRole } from '@prisma/client';
 import { workOrdersController } from './work-orders.controller';
 import { aiTriageController } from '../ai-triage/ai-triage.controller';
 import { reviewAITriageSchema } from '../ai-triage/ai-triage.schemas';
+import { uploadsController } from '../uploads/uploads.controller';
+import { uploadImageSchema } from '../uploads/uploads.schemas';
 import { authenticate, authorize } from '../../common/middleware/auth';
 import { validate } from '../../common/middleware/validate';
 import { asyncHandler } from '../../common/utils/async-handler';
@@ -129,6 +131,22 @@ router.post(
   authorize(UserRole.ADMIN, UserRole.MANAGER),
   validate(reviewAITriageSchema),
   asyncHandler(aiTriageController.reviewAnalysis)
+);
+
+router.post(
+  '/:id/images',
+  validate(uploadImageSchema),
+  asyncHandler(uploadsController.upload)
+);
+
+router.get(
+  '/:id/images',
+  asyncHandler(uploadsController.list)
+);
+
+router.delete(
+  '/:id/images/:imageId',
+  asyncHandler(uploadsController.delete)
 );
 
 export { router as workOrdersRoutes };
