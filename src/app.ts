@@ -4,12 +4,14 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 
+import { env } from './config/env';
 import { logger } from './config/logger';
 import { corsOptions } from './config/cors';
 import { requestIdMiddleware } from './common/middleware/request-id';
 import { notFoundHandler } from './common/middleware/not-found';
 import { errorHandler } from './common/middleware/error-handler';
 import { healthRoutes } from './modules/health/health.routes';
+import { authRoutes } from './modules/auth/auth.routes';
 
 const app = express();
 
@@ -33,6 +35,7 @@ app.use(
 );
 
 app.use(healthRoutes);
+app.use(`${env.API_PREFIX}/auth`, authRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

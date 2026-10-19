@@ -152,6 +152,7 @@ model User {
   statusChanges       WorkOrderStatusHistory[]
   aiReviews           WorkOrderAIAnalysis[]
   uploadedImages      WorkOrderImage[]
+  passwordResetTokens PasswordResetToken[]
 
   @@unique([normalizedEmail, organizationId])
   @@index([organizationId])
@@ -176,6 +177,21 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Invitation {
