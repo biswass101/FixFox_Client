@@ -110,6 +110,17 @@ export class WorkOrdersController {
     sendSuccess(res, workOrder);
   };
 
+  cancel = async (req: Request, res: Response): Promise<void> => {
+    const workOrder = await this.service.cancelWorkOrder(
+      req.user!.organizationId,
+      req.params.id,
+      req.user!.userId,
+      req.user!.role as UserRole,
+      req.body?.reason
+    );
+    sendSuccess(res, workOrder);
+  };
+
   getHistory = async (req: Request, res: Response): Promise<void> => {
     const workOrder = await this.service.getById(
       req.user!.organizationId,

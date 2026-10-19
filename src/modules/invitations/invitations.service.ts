@@ -62,7 +62,7 @@ export class InvitationsService {
       prisma.user.findUnique({ where: { id: invitedById } }),
     ]);
 
-    const inviteUrl = `${env.FRONTEND_URL}/invitations/accept?token=${rawToken}`;
+    const inviteUrl = `${env.FRONTEND_URL}/invite/accept?token=${rawToken}`;
 
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

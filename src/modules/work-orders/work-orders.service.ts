@@ -247,6 +247,14 @@ export class WorkOrdersService {
       );
     }
 
+    if (
+      (input.status === WorkOrderStatus.IN_PROGRESS ||
+        input.status === WorkOrderStatus.RESOLVED) &&
+      !current.assigneeId
+    ) {
+      throw BadRequestError('A technician must be assigned before starting work on this ticket');
+    }
+
     const extraData: { startedAt?: Date } = {};
     if (
       input.status === WorkOrderStatus.IN_PROGRESS &&
@@ -368,6 +376,39 @@ export class WorkOrdersService {
       userId,
       WorkOrderStatus.IN_PROGRESS,
       `Reopened: ${input.reason}`
+    );
+  }
+
+  async cancelWorkOrder(
+    organizationId: string,
+    workOrderId: string,
+    userId: string,
+    userRole: UserRole,
+    reason?: string
+  ): Promise<WorkOrder> {
+    if (userRole !== UserRole.ADMIN && userRole !== UserRole.MANAGER) {
+      throw ForbiddenError('Only managers and administrators can cancel work orders');
+    }
+
+    const current = await this.repo.findById(organizationId, workOrderId, true);
+    if (!current) {
+      throw NotFoundError('Work order');
+    }
+
+    if (current.status === WorkOrderStatus.CLOSED || current.status === WorkOrderStatus.CANCELLED) {
+      throw new AppError(
+        400,
+        ErrorCode.INVALID_STATE_TRANSITION,
+        `Cannot cancel a work order that is already ${current.status}`
+      );
+    }
+
+    return this.repo.updateStatus(
+      organizationId,
+      workOrderId,
+      userId,
+      WorkOrderStatus.CANCELLED,
+      reason ? `Cancelled: ${reason}` : 'Cancelled by manager/administrator'
     );
   }
 

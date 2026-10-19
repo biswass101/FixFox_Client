@@ -77,6 +77,12 @@ router.post(
   asyncHandler(workOrdersController.reopen)
 );
 
+router.post(
+  '/:id/cancel',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  asyncHandler(workOrdersController.cancel)
+);
+
 router.get(
   '/:id/history',
   asyncHandler(workOrdersController.getHistory)

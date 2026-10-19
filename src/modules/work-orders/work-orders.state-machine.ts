@@ -3,7 +3,6 @@ import { WorkOrderStatus, UserRole } from '@prisma/client';
 const validTransitions: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   [WorkOrderStatus.OPEN]: [
     WorkOrderStatus.ASSIGNED,
-    WorkOrderStatus.IN_PROGRESS,
     WorkOrderStatus.CANCELLED,
   ],
   [WorkOrderStatus.ASSIGNED]: [

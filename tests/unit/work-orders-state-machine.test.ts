@@ -9,7 +9,7 @@ describe('Work Order State Machine', () => {
   describe('isValidTransition', () => {
     it('allows valid transitions from OPEN', () => {
       expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED)).toBe(true);
-      expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS)).toBe(true);
+      expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS)).toBe(false);
       expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.CANCELLED)).toBe(true);
       expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.RESOLVED)).toBe(false);
       expect(isValidTransition(WorkOrderStatus.OPEN, WorkOrderStatus.CLOSED)).toBe(false);

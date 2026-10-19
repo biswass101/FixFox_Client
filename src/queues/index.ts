@@ -37,16 +37,28 @@ export const recurringFaultQueue = new Queue<RecurringFaultJobPayload>(
 export async function dispatchAITriage(
   payload: AITriageJobPayload
 ): Promise<string | undefined> {
+  let jobId: string | undefined;
   try {
     const job = await aiTriageQueue.add('analyze-work-order', payload, {
       jobId: `ai-triage:${payload.workOrderId}${payload.isRetry ? `:${Date.now()}` : ''}`,
     });
-    logger.info({ workOrderId: payload.workOrderId, jobId: job.id }, 'Dispatched AI triage job');
-    return job.id;
+    logger.info({ workOrderId: payload.workOrderId, jobId: job.id }, 'Dispatched AI triage job to queue');
+    jobId = job.id;
   } catch (error) {
-    logger.error({ error, payload }, 'Failed to dispatch AI triage job');
-    return undefined;
+    logger.warn({ error, payload }, 'Failed to queue AI triage job, initiating direct background triage');
   }
+
+  // Ensure triage is executed immediately in the background even if external worker is offline
+  setImmediate(async () => {
+    try {
+      const { aiTriageService } = await import('../modules/ai-triage/ai-triage.service');
+      await aiTriageService.runTriage(payload.workOrderId, payload.organizationId);
+    } catch (err) {
+      logger.error({ err, workOrderId: payload.workOrderId }, 'Background AI triage execution failed');
+    }
+  });
+
+  return jobId;
 }
 
 export async function dispatchEmail(payload: EmailJobPayload): Promise<string | undefined> {

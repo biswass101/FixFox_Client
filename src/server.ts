@@ -4,8 +4,13 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { disconnectDatabase } from './database/prisma';
 import { disconnectRedis } from './database/redis';
+import { createAITriageWorker } from './workers/ai-triage.worker';
+import { createEmailWorker } from './workers/email.worker';
 
 const server = http.createServer(app);
+
+let aiWorker: ReturnType<typeof createAITriageWorker> | null = null;
+let emailWorker: ReturnType<typeof createEmailWorker> | null = null;
 
 server.listen(env.PORT, () => {
   logger.info(
@@ -16,10 +21,23 @@ server.listen(env.PORT, () => {
     },
     `FixFlow API server running on port ${env.PORT}`
   );
+
+  if (env.NODE_ENV !== 'test') {
+    try {
+      aiWorker = createAITriageWorker();
+      emailWorker = createEmailWorker();
+      logger.info('Embedded AI triage and email workers initialized in API process');
+    } catch (workerErr) {
+      logger.warn({ workerErr }, 'Could not initialize embedded BullMQ workers');
+    }
+  }
 });
 
 async function gracefulShutdown(signal: string): Promise<void> {
   logger.info(`${signal} received. Starting graceful shutdown...`);
+
+  if (aiWorker) await aiWorker.close();
+  if (emailWorker) await emailWorker.close();
 
   server.close(async (err) => {
     if (err) {
